@@ -8,12 +8,13 @@ import {
   Calendar,
   Flag,
   User,
-  SlidersHorizontal,
-  Maximize2,
-  Minimize2,
-  ChevronLeft,
-  ChevronRight
+  SlidersHorizontal
 } from 'lucide-react';
+import { LoginScreen, UserSession } from './components/LoginScreen';
+import { Sidebar } from './components/Sidebar';
+import { NewMachineModal } from './components/NewMachineModal';
+import { NewUserModal } from './components/NewUserModal';
+import { UsersListModal } from './components/UsersListModal';
 
 export type MachineState = 'operando' | 'ociosa' | 'parada' | 'manutencao';
 
@@ -52,6 +53,54 @@ export interface KanbanColumn {
   stopReason?: string;
   cardIds: string[];
 }
+
+const INITIAL_USERS: UserSession[] = [
+  {
+    id: 'usr-01',
+    name: 'Jefferson Santos',
+    email: 'gerente@indusmes.com.br',
+    role: 'Gerente de Produção',
+    matricula: 'RE-4091',
+    shift: 'Administrativo / Geral',
+    avatarColor: 'bg-blue-600'
+  },
+  {
+    id: 'usr-02',
+    name: 'Mariana Vasconcelos',
+    email: 'supervisor@indusmes.com.br',
+    role: 'Supervisor de Linha',
+    matricula: 'RE-2185',
+    shift: 'Turno A (06:00 - 14:30)',
+    avatarColor: 'bg-emerald-600'
+  },
+  {
+    id: 'usr-03',
+    name: 'Marcos Silveira',
+    email: 'marcos.silveira@indusmes.com.br',
+    role: 'Operador Especialista',
+    matricula: 'RE-1044',
+    shift: 'Turno A (06:00 - 14:30)',
+    avatarColor: 'bg-amber-600'
+  },
+  {
+    id: 'usr-04',
+    name: 'Patrícia Duarte',
+    email: 'patricia.duarte@indusmes.com.br',
+    role: 'Operador Especialista',
+    matricula: 'RE-1088',
+    shift: 'Turno A (06:00 - 14:30)',
+    avatarColor: 'bg-rose-600'
+  },
+  {
+    id: 'usr-05',
+    name: 'Lucas Mendes',
+    email: 'lucas.mendes@indusmes.com.br',
+    role: 'Técnico de Manutenção',
+    matricula: 'RE-3302',
+    shift: 'Turno A (06:00 - 14:30)',
+    avatarColor: 'bg-purple-600'
+  }
+];
 
 const INITIAL_CARDS: Record<string, KanbanCard> = {
   // Atividades Pendentes
@@ -201,9 +250,6 @@ const INITIAL_CARDS: Record<string, KanbanCard> = {
     dayBadge: 'seg',
     avatarColor: 'bg-amber-800'
   },
-
-  // Máquina PRE-03 (Prensa)
-  // Ociosa inicialmente
 
   // Máquina ROB-04 (Solda - Parada)
   'c-05': {
@@ -411,19 +457,30 @@ const INITIAL_COLUMNS: KanbanColumn[] = [
 ];
 
 export default function App() {
+  // Authentication session
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(INITIAL_USERS[0]);
+  const [usersList, setUsersList] = useState<UserSession[]>(INITIAL_USERS);
+
+  // Kanban state
   const [columns, setColumns] = useState<KanbanColumn[]>(INITIAL_COLUMNS);
   const [cards, setCards] = useState<Record<string, KanbanCard>>(INITIAL_CARDS);
+  const [activeSection, setActiveSection] = useState<string>('kanban');
   
   // Drag and drop states
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
 
-  // Modals
+  // Modals state
   const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null);
   const [editingMachine, setEditingMachine] = useState<KanbanColumn | null>(null);
   const [machineStatusInput, setMachineStatusInput] = useState<MachineState>('operando');
   const [machineReasonInput, setMachineReasonInput] = useState<string>('');
+  
+  // Registration modals
   const [newOrderModalOpen, setNewOrderModalOpen] = useState<boolean>(false);
+  const [newMachineModalOpen, setNewMachineModalOpen] = useState<boolean>(false);
+  const [newUserModalOpen, setNewUserModalOpen] = useState<boolean>(false);
+  const [usersListModalOpen, setUsersListModalOpen] = useState<boolean>(false);
 
   // New order form
   const [newNum, setNewNum] = useState<string>(`OP-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -431,6 +488,11 @@ export default function App() {
   const [newCust, setNewCust] = useState<string>('');
   const [newQty, setNewQty] = useState<number>(500);
   const [newPriority, setNewPriority] = useState<KanbanCard['priority']>('alta');
+
+  // If not authenticated, render Login Screen
+  if (!currentUser) {
+    return <LoginScreen onLogin={(user) => setCurrentUser(user)} />;
+  }
 
   // Machine KPI counters
   const machineCols = columns.filter((c) => !c.isQueue);
@@ -544,6 +606,16 @@ export default function App() {
     setEditingMachine(null);
   };
 
+  // Create new machine (Appends as a new machine block in Kanban!)
+  const handleAddMachine = (newCol: KanbanColumn) => {
+    setColumns((prev) => [...prev, newCol]);
+  };
+
+  // Create new user (Appends to usersList)
+  const handleAddUser = (newUser: UserSession) => {
+    setUsersList((prev) => [newUser, ...prev]);
+  };
+
   // Create new order in the pending queue
   const handleCreateOrder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -592,195 +664,210 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#eef1f5] text-slate-800 flex flex-col font-sans select-none">
-      {/* Top Header Bar */}
-      <header className="bg-white border-b border-slate-200/90 px-3 sm:px-4 py-2 shrink-0 flex items-center justify-between gap-2">
-        {/* Title */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs" />
-            <span className="font-extrabold text-xs sm:text-sm text-slate-900 tracking-tight whitespace-nowrap">
-              IndusMES
+    <div className="h-screen w-screen overflow-hidden bg-[#f4f6f9] text-slate-800 flex font-sans select-none">
+      {/* Sidebar Menu */}
+      <Sidebar
+        currentUser={currentUser}
+        onLogout={() => setCurrentUser(null)}
+        onOpenNewMachine={() => setNewMachineModalOpen(true)}
+        onOpenNewUser={() => setNewUserModalOpen(true)}
+        onOpenNewOrder={() => setNewOrderModalOpen(true)}
+        onOpenUsersList={() => setUsersListModalOpen(true)}
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+      />
+
+      {/* Main App Content Area */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+        {/* Top Header Bar */}
+        <header className="bg-white border-b border-slate-200/90 px-4 py-2 shrink-0 flex items-center justify-between gap-2">
+          {/* Title */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs" />
+              <span className="font-extrabold text-xs sm:text-sm text-slate-900 tracking-tight whitespace-nowrap">
+                Quadro de Chão de Fábrica
+              </span>
+            </div>
+
+            <span className="text-slate-300 hidden md:inline">|</span>
+            <span className="text-[11px] text-slate-500 font-medium hidden sm:inline truncate">
+              Arraste as tarefas pendentes para as máquinas
             </span>
           </div>
 
-          <span className="text-slate-300 hidden md:inline">|</span>
-          <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
-            Kanban de Máquinas & Serviços · Arraste as tarefas pendentes para as máquinas
-          </span>
-        </div>
+          {/* Machine Status Counters & Actions */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 text-[10px] sm:text-xs shrink-0">
+            <div className="hidden sm:flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              <span className="text-slate-500">Operando:</span>
+              <strong className="text-slate-800 font-bold">{runningCount}</strong>
+            </div>
 
-        {/* Machine Status Counters & Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 text-[10px] sm:text-xs shrink-0">
-          <div className="hidden sm:flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            <span className="text-slate-500">Operando:</span>
-            <strong className="text-slate-800 font-bold">{runningCount}</strong>
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+              <span className="text-slate-500">Ociosas:</span>
+              <strong className="text-slate-800 font-bold">{idleCount}</strong>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+              <span className="text-slate-500">Paradas:</span>
+              <strong className="text-slate-800 font-bold">{stoppedCount}</strong>
+            </div>
+
+            <button
+              onClick={() => setNewOrderModalOpen(true)}
+              className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-semibold transition-colors shadow-xs whitespace-nowrap cursor-pointer"
+            >
+              <Plus className="w-3 h-3" />
+              <span>+ Nova Tarefa</span>
+            </button>
           </div>
+        </header>
 
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-            <span className="text-slate-500">Ociosas:</span>
-            <strong className="text-slate-800 font-bold">{idleCount}</strong>
-          </div>
+        {/* Kanban Board Canvas with permanent horizontal scroll */}
+        <main className="flex-1 p-3 overflow-hidden min-h-0 flex flex-col">
+          <div className="flex-1 flex items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-3 pt-1 px-1">
+            {columns.map((col) => {
+              const isDragTarget = dragOverColId === col.id;
+              const columnCards = col.cardIds
+                .map((id) => cards[id])
+                .filter(Boolean) as KanbanCard[];
 
-          <div className="hidden sm:flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-            <span className="text-slate-500">Paradas:</span>
-            <strong className="text-slate-800 font-bold">{stoppedCount}</strong>
-          </div>
-
-          <button
-            onClick={() => setNewOrderModalOpen(true)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded text-[11px] font-semibold transition-colors shadow-xs whitespace-nowrap"
-          >
-            <Plus className="w-3 h-3" />
-            <span>+ Nova Tarefa</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Kanban Board Canvas - Permanent Scroll Columns */}
-      <main className="flex-1 p-3 overflow-hidden min-h-0 flex flex-col">
-        <div className="flex-1 flex items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-3 pt-1 px-1">
-          {columns.map((col) => {
-            const isDragTarget = dragOverColId === col.id;
-            const columnCards = col.cardIds
-              .map((id) => cards[id])
-              .filter(Boolean) as KanbanCard[];
-
-            return (
-              <div
-                key={col.id}
-                onDragOver={(e) => handleDragOver(e, col.id)}
-                onDragLeave={() => handleDragLeave(col.id)}
-                onDrop={(e) => handleDrop(e, col.id)}
-                className={`bg-[#e4e7ec] rounded-2xl p-2.5 flex flex-col h-full border min-w-0 transition-all w-64 sm:w-72 shrink-0 ${
-                  isDragTarget
-                    ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/30'
-                    : 'border-slate-300/70'
-                }`}
-              >
-                {/* Column Top Header: Badge is strictly contained with min-w-0 & truncate */}
-                <div className="pb-1.5 pt-0.5 px-0.5 shrink-0 min-w-0 space-y-1">
-                  {/* Row 1: The Badge Pill (100% inside container, never overflows!) */}
-                  <div className="flex items-center justify-between gap-1 min-w-0 w-full">
-                    <button
-                      onClick={() => {
-                        if (!col.isQueue) {
-                          setEditingMachine(col);
-                          setMachineStatusInput(col.status);
-                          setMachineReasonInput(col.stopReason || '');
-                        }
-                      }}
-                      className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase shadow-2xs transition-transform min-w-0 flex-1 max-w-[calc(100%-24px)] ${
-                        !col.isQueue ? 'hover:scale-102 cursor-pointer' : ''
-                      } ${col.badgeColor.bg} ${col.badgeColor.text}`}
-                      title={`${col.badgeLabel} - Clique para alterar status`}
-                    >
-                      <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 border border-black/20 ${col.badgeColor.dot}`} />
-                      <span className="truncate block text-left">
-                        {col.shortCode}
-                      </span>
-                    </button>
-
-                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 font-mono shrink-0 px-1">
-                      {columnCards.length}
-                    </span>
-                  </div>
-
-                  {/* Row 2: Machine Type & Subtitle (strictly truncated, never spills out) */}
-                  <div className="text-[9px] sm:text-[10px] text-slate-500 font-medium truncate px-0.5" title={col.title}>
-                    <strong className="text-slate-700">{col.machineType}</strong> · {col.subtitle}
-                  </div>
-                </div>
-
-                {/* Cards Container: Smooth internal scroll, cleanly contained */}
-                <div className="flex-1 overflow-y-auto space-y-1.5 sm:space-y-2 pr-0.5 min-h-0 min-w-0">
-                  {columnCards.map((card) => (
-                    <div
-                      key={card.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, card.id)}
-                      onClick={() => setSelectedCard(card)}
-                      className="bg-white rounded-lg sm:rounded-xl p-2 sm:p-2.5 shadow-2xs border border-slate-200/90 hover:shadow-md hover:border-slate-300 transition-all cursor-grab active:cursor-grabbing text-xs space-y-1.5 min-w-0 group"
-                    >
-                      {/* Card Title & Code */}
-                      <div className="flex items-baseline justify-between gap-1 min-w-0">
-                        <h3 className="font-bold text-slate-900 text-xs sm:text-sm leading-tight group-hover:text-blue-600 transition-colors truncate">
-                          {card.taskCode}
-                        </h3>
-                        <span className="text-[8px] sm:text-[9px] font-mono text-slate-400 font-semibold shrink-0">
-                          {card.orderNumber}
+              return (
+                <div
+                  key={col.id}
+                  onDragOver={(e) => handleDragOver(e, col.id)}
+                  onDragLeave={() => handleDragLeave(col.id)}
+                  onDrop={(e) => handleDrop(e, col.id)}
+                  className={`bg-[#e4e7ec] rounded-2xl p-2.5 flex flex-col h-full border min-w-0 transition-all w-64 sm:w-72 shrink-0 ${
+                    isDragTarget
+                      ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/30'
+                      : 'border-slate-300/70'
+                  }`}
+                >
+                  {/* Column Top Header: Badge is strictly contained with min-w-0 & truncate */}
+                  <div className="pb-1.5 pt-0.5 px-0.5 shrink-0 min-w-0 space-y-1">
+                    {/* Row 1: The Badge Pill */}
+                    <div className="flex items-center justify-between gap-1 min-w-0 w-full">
+                      <button
+                        onClick={() => {
+                          if (!col.isQueue) {
+                            setEditingMachine(col);
+                            setMachineStatusInput(col.status);
+                            setMachineReasonInput(col.stopReason || '');
+                          }
+                        }}
+                        className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase shadow-2xs transition-transform min-w-0 flex-1 max-w-[calc(100%-24px)] ${
+                          !col.isQueue ? 'hover:scale-102 cursor-pointer' : ''
+                        } ${col.badgeColor.bg} ${col.badgeColor.text}`}
+                        title={`${col.badgeLabel} - Clique para alterar status`}
+                      >
+                        <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 border border-black/20 ${col.badgeColor.dot}`} />
+                        <span className="truncate block text-left">
+                          {col.shortCode}
                         </span>
-                      </div>
+                      </button>
 
-                      {/* Product Name (Always cleanly truncated) */}
-                      <p className="text-[10px] sm:text-[11px] text-slate-500 truncate leading-snug" title={card.productName}>
-                        {card.productName}
-                      </p>
-
-                      {/* Description Icon (the 3 lines from image) */}
-                      <div className="text-slate-300 flex items-center pt-0.5">
-                        <AlignLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      </div>
-
-                      {/* Bottom Metadata: Avatar Circle + Calendar Day + Priority Flag */}
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[9px] sm:text-[10px] min-w-0 gap-1">
-                        {/* Avatar */}
-                        <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold shrink-0 ${card.avatarColor}`}>
-                          <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
-                        </div>
-
-                        {/* Calendar Day Badge (e.g. [📅 seg]) */}
-                        <div className="flex items-center gap-0.5 sm:gap-1 border border-slate-200 bg-slate-50/80 px-1 py-0.5 rounded text-slate-600 font-mono text-[8px] sm:text-[9px] truncate shrink-0">
-                          <Calendar className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-slate-400" />
-                          <span>{card.dayBadge}</span>
-                        </div>
-
-                        {/* Priority Flag */}
-                        <div className="border border-slate-200 bg-slate-50/80 p-0.5 rounded shrink-0">
-                          <Flag className={`w-2 h-2 sm:w-2.5 sm:h-2.5 ${getPriorityFlagColor(card.priority)}`} />
-                        </div>
-                      </div>
-
-                      {/* If card is on a machine, show compact progress */}
-                      {!col.isQueue && card.plannedQty > 0 && (
-                        <div className="pt-0.5">
-                          <div className="flex justify-between text-[8px] sm:text-[9px] font-mono text-slate-500 mb-0.5">
-                            <span>{card.producedQty}/{card.plannedQty}</span>
-                            <span className="font-bold text-slate-700">
-                              {((card.producedQty / card.plannedQty) * 100).toFixed(0)}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
-                            <div
-                              className="h-full bg-emerald-500"
-                              style={{ width: `${(card.producedQty / card.plannedQty) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-
-                  {/* Empty State */}
-                  {columnCards.length === 0 && (
-                    <div className="border-2 border-dashed border-slate-300 rounded-lg p-2 sm:p-3 text-center my-auto space-y-0.5">
-                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 block">
-                        Livre
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 font-mono shrink-0 px-1">
+                        {columnCards.length}
                       </span>
-                      <p className="text-[9px] text-slate-400">
-                        Solte uma tarefa
-                      </p>
                     </div>
-                  )}
+
+                    {/* Row 2: Machine Type & Subtitle */}
+                    <div className="text-[9px] sm:text-[10px] text-slate-500 font-medium truncate px-0.5" title={col.title}>
+                      <strong className="text-slate-700">{col.machineType}</strong> · {col.subtitle}
+                    </div>
+                  </div>
+
+                  {/* Cards Container: Smooth internal scroll, cleanly contained */}
+                  <div className="flex-1 overflow-y-auto space-y-1.5 sm:space-y-2 pr-0.5 min-h-0 min-w-0">
+                    {columnCards.map((card) => (
+                      <div
+                        key={card.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, card.id)}
+                        onClick={() => setSelectedCard(card)}
+                        className="bg-white rounded-lg sm:rounded-xl p-2 sm:p-2.5 shadow-2xs border border-slate-200/90 hover:shadow-md hover:border-slate-300 transition-all cursor-grab active:cursor-grabbing text-xs space-y-1.5 min-w-0 group"
+                      >
+                        {/* Card Title & Code */}
+                        <div className="flex items-baseline justify-between gap-1 min-w-0">
+                          <h3 className="font-bold text-slate-900 text-xs sm:text-sm leading-tight group-hover:text-blue-600 transition-colors truncate">
+                            {card.taskCode}
+                          </h3>
+                          <span className="text-[8px] sm:text-[9px] font-mono text-slate-400 font-semibold shrink-0">
+                            {card.orderNumber}
+                          </span>
+                        </div>
+
+                        {/* Product Name (Cleanly truncated) */}
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 truncate leading-snug" title={card.productName}>
+                          {card.productName}
+                        </p>
+
+                        {/* Description Icon (the 3 lines from image) */}
+                        <div className="text-slate-300 flex items-center pt-0.5">
+                          <AlignLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        </div>
+
+                        {/* Bottom Metadata: Avatar Circle + Calendar Day + Priority Flag */}
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[9px] sm:text-[10px] min-w-0 gap-1">
+                          {/* Avatar */}
+                          <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold shrink-0 ${card.avatarColor}`}>
+                            <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
+                          </div>
+
+                          {/* Calendar Day Badge */}
+                          <div className="flex items-center gap-0.5 sm:gap-1 border border-slate-200 bg-slate-50/80 px-1 py-0.5 rounded text-slate-600 font-mono text-[8px] sm:text-[9px] truncate shrink-0">
+                            <Calendar className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-slate-400" />
+                            <span>{card.dayBadge}</span>
+                          </div>
+
+                          {/* Priority Flag */}
+                          <div className="border border-slate-200 bg-slate-50/80 p-0.5 rounded shrink-0">
+                            <Flag className={`w-2 h-2 sm:w-2.5 sm:h-2.5 ${getPriorityFlagColor(card.priority)}`} />
+                          </div>
+                        </div>
+
+                        {/* If card is on a machine, show compact progress */}
+                        {!col.isQueue && card.plannedQty > 0 && (
+                          <div className="pt-0.5">
+                            <div className="flex justify-between text-[8px] sm:text-[9px] font-mono text-slate-500 mb-0.5">
+                              <span>{card.producedQty}/{card.plannedQty}</span>
+                              <span className="font-bold text-slate-700">
+                                {((card.producedQty / card.plannedQty) * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-500"
+                                style={{ width: `${(card.producedQty / card.plannedQty) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Empty State */}
+                    {columnCards.length === 0 && (
+                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-2 sm:p-3 text-center my-auto space-y-0.5">
+                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 block">
+                          Livre
+                        </span>
+                        <p className="text-[9px] text-slate-400">
+                          Solte uma tarefa
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </main>
+              );
+            })}
+          </div>
+        </main>
+      </div>
 
       {/* Modal: Detalhes da Tarefa / Ordem */}
       {selectedCard && (
@@ -797,7 +884,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setSelectedCard(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -847,7 +934,7 @@ export default function App() {
             <div className="pt-2 flex items-center justify-end border-t border-slate-100">
               <button
                 onClick={() => setSelectedCard(null)}
-                className="px-3.5 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer shadow-xs transition-colors"
               >
                 Fechar
               </button>
@@ -871,7 +958,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setEditingMachine(null)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -891,7 +978,7 @@ export default function App() {
                   <button
                     key={st.id}
                     onClick={() => setMachineStatusInput(st.id as MachineState)}
-                    className={`p-2 rounded border text-center font-bold text-[11px] transition-all ${
+                    className={`p-2 rounded border text-center font-bold text-[11px] transition-all cursor-pointer ${
                       machineStatusInput === st.id ? `${st.cls} ring-2 ring-blue-500` : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
@@ -917,13 +1004,13 @@ export default function App() {
             <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
               <button
                 onClick={() => setEditingMachine(null)}
-                className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded text-xs"
+                className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded text-xs cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSaveMachineStatus}
-                className="px-3.5 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold"
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer shadow-xs transition-colors"
               >
                 Salvar
               </button>
@@ -942,7 +1029,7 @@ export default function App() {
               </h3>
               <button
                 onClick={() => setNewOrderModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1014,13 +1101,13 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setNewOrderModalOpen(false)}
-                  className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded text-xs"
+                  className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded text-xs cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-3.5 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold"
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer shadow-xs transition-colors"
                 >
                   Adicionar à Fila
                 </button>
@@ -1028,6 +1115,31 @@ export default function App() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal: Cadastrar Máquina */}
+      {newMachineModalOpen && (
+        <NewMachineModal
+          onClose={() => setNewMachineModalOpen(false)}
+          onAddMachine={handleAddMachine}
+        />
+      )}
+
+      {/* Modal: Cadastrar Usuário */}
+      {newUserModalOpen && (
+        <NewUserModal
+          onClose={() => setNewUserModalOpen(false)}
+          onAddUser={handleAddUser}
+        />
+      )}
+
+      {/* Modal: Lista de Usuários */}
+      {usersListModalOpen && (
+        <UsersListModal
+          users={usersList}
+          onClose={() => setUsersListModalOpen(false)}
+          onOpenNewUser={() => setNewUserModalOpen(true)}
+        />
       )}
     </div>
   );
