@@ -13,9 +13,10 @@ export interface UserSession {
 
 interface LoginScreenProps {
   onLogin: (user: UserSession) => void;
+  availableUsers?: UserSession[];
 }
 
-export const LoginScreen = ({ onLogin }: LoginScreenProps) => {
+export const LoginScreen = ({ onLogin, availableUsers }: LoginScreenProps) => {
   const [email, setEmail] = useState('gerente@indusmes.com.br');
   const [password, setPassword] = useState('123456');
 
@@ -49,9 +50,14 @@ export const LoginScreen = ({ onLogin }: LoginScreenProps) => {
     }
   ];
 
+  const usersList = availableUsers && availableUsers.length > 0 ? availableUsers : DEMO_USERS;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const matched = DEMO_USERS.find((u) => u.email === email) || DEMO_USERS[0];
+    const cleanInput = email.trim().toLowerCase();
+    const matched = usersList.find(
+      (u) => u.email.toLowerCase() === cleanInput || u.matricula.toLowerCase() === cleanInput
+    ) || usersList[0];
     onLogin(matched);
   };
 
@@ -121,7 +127,7 @@ export const LoginScreen = ({ onLogin }: LoginScreenProps) => {
               Acesso Rápido para Demonstração:
             </span>
             <div className="space-y-1.5">
-              {DEMO_USERS.map((user) => (
+              {usersList.slice(0, 3).map((user) => (
                 <button
                   key={user.id}
                   type="button"

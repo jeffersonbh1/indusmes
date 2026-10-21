@@ -457,8 +457,8 @@ const INITIAL_COLUMNS: KanbanColumn[] = [
 ];
 
 export default function App() {
-  // Authentication session
-  const [currentUser, setCurrentUser] = useState<UserSession | null>(INITIAL_USERS[0]);
+  // Authentication session - starts null so app opens directly to Login Screen
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [usersList, setUsersList] = useState<UserSession[]>(INITIAL_USERS);
 
   // Kanban state
@@ -662,6 +662,16 @@ export default function App() {
         return 'text-emerald-500 fill-emerald-500';
     }
   };
+
+  // If no user is authenticated, show the Login Screen
+  if (!currentUser) {
+    return (
+      <LoginScreen
+        onLogin={(user) => setCurrentUser(user)}
+        availableUsers={usersList}
+      />
+    );
+  }
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#f4f6f9] text-slate-800 flex font-sans select-none">
