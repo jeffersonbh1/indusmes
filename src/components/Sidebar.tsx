@@ -8,7 +8,8 @@ import {
   LogOut, 
   ChevronLeft, 
   ChevronRight, 
-  Factory
+  Factory,
+  BarChart3
 } from 'lucide-react';
 import { UserSession } from './LoginScreen';
 
@@ -89,6 +90,20 @@ export const Sidebar = ({
           >
             <Columns className="w-4 h-4 text-blue-600 shrink-0" />
             {!collapsed && <span className="truncate">Quadro Kanban</span>}
+          </button>
+
+          {/* Item 2: Dashboard OEE (Recharts) */}
+          <button
+            onClick={() => setActiveSection('dashboard')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              activeSection === 'dashboard'
+                ? 'bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs font-bold'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+            title="Dashboard de OEE & Métricas Industriais (Recharts)"
+          >
+            <BarChart3 className="w-4 h-4 text-purple-600 shrink-0" />
+            {!collapsed && <span className="truncate">Dashboard OEE</span>}
           </button>
 
           {/* Section Divider */}

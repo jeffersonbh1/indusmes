@@ -44,6 +44,9 @@ export const NewMachineModal = ({ onClose, onAddMachine }: NewMachineModalProps)
       isQueue: false,
       status,
       oee: Number(oee),
+      availability: status === 'operando' ? 92.0 : status === 'ociosa' ? 65.0 : 40.0,
+      performance: status === 'operando' ? 95.0 : 70.0,
+      quality: 99.0,
       idleMinutes: status === 'ociosa' ? 10 : 0,
       cardIds: []
     };

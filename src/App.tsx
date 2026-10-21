@@ -8,13 +8,16 @@ import {
   Calendar,
   Flag,
   User,
-  SlidersHorizontal
+  SlidersHorizontal,
+  BarChart3,
+  Columns
 } from 'lucide-react';
 import { LoginScreen, UserSession } from './components/LoginScreen';
 import { Sidebar } from './components/Sidebar';
 import { NewMachineModal } from './components/NewMachineModal';
 import { NewUserModal } from './components/NewUserModal';
 import { UsersListModal } from './components/UsersListModal';
+import { DashboardView } from './components/DashboardView';
 
 export type MachineState = 'operando' | 'ociosa' | 'parada' | 'manutencao';
 
@@ -49,6 +52,9 @@ export interface KanbanColumn {
   isQueue: boolean;
   status: MachineState;
   oee?: number;
+  availability?: number;
+  performance?: number;
+  quality?: number;
   idleMinutes?: number;
   stopReason?: string;
   cardIds: string[];
@@ -360,6 +366,9 @@ const INITIAL_COLUMNS: KanbanColumn[] = [
     isQueue: false,
     status: 'operando',
     oee: 88.4,
+    availability: 91.5,
+    performance: 97.2,
+    quality: 99.4,
     idleMinutes: 15,
     cardIds: ['c-09', 'c-08']
   },
@@ -378,6 +387,9 @@ const INITIAL_COLUMNS: KanbanColumn[] = [
     isQueue: false,
     status: 'operando',
     oee: 82.0,
+    availability: 89.0,
+    performance: 93.5,
+    quality: 98.6,
     idleMinutes: 20,
     cardIds: ['c-07', 'c-06']
   },
@@ -396,6 +408,9 @@ const INITIAL_COLUMNS: KanbanColumn[] = [
     isQueue: false,
     status: 'ociosa',
     oee: 52.0,
+    availability: 62.0,
+    performance: 85.0,
+    quality: 98.7,
     idleMinutes: 105,
     cardIds: []
   },
@@ -415,6 +430,9 @@ const INITIAL_COLUMNS: KanbanColumn[] = [
     status: 'parada',
     stopReason: 'Troca de bico e calibração de gás',
     oee: 67.5,
+    availability: 74.0,
+    performance: 92.0,
+    quality: 99.1,
     idleMinutes: 50,
     cardIds: ['c-05', 'c-02']
   },
@@ -433,6 +451,9 @@ const INITIAL_COLUMNS: KanbanColumn[] = [
     isQueue: false,
     status: 'operando',
     oee: 91.5,
+    availability: 94.0,
+    performance: 98.0,
+    quality: 99.3,
     idleMinutes: 10,
     cardIds: ['c-01', 'c-03', 'c-04']
   },
@@ -451,6 +472,9 @@ const INITIAL_COLUMNS: KanbanColumn[] = [
     isQueue: false,
     status: 'ociosa',
     oee: 79.0,
+    availability: 82.0,
+    performance: 96.5,
+    quality: 99.8,
     idleMinutes: 80,
     cardIds: []
   }
@@ -663,6 +687,32 @@ export default function App() {
     }
   };
 
+  // Helper to extract or calculate real-time metrics for each machine column
+  const getColumnMetrics = (col: KanbanColumn) => {
+    let a = col.availability ?? 85.0;
+    let p = col.performance ?? 90.0;
+    let q = col.quality ?? 98.5;
+
+    if (col.status === 'parada') {
+      a = 42.0;
+      p = 55.0;
+      q = 91.0;
+    } else if (col.status === 'ociosa') {
+      a = 68.0;
+      p = 70.0;
+      q = 97.0;
+    } else if (col.status === 'operando') {
+      if (col.oee) {
+        a = col.availability ?? 92.5;
+        q = col.quality ?? 98.8;
+        p = col.performance ?? Number(((col.oee / (a * q / 10000))).toFixed(1));
+      }
+    }
+
+    const liveOee = Number(((a * p * q) / 10000).toFixed(1));
+    return { a, p, q, liveOee };
+  };
+
   // If no user is authenticated, show the Login Screen
   if (!currentUser) {
     return (
@@ -691,19 +741,44 @@ export default function App() {
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         {/* Top Header Bar */}
         <header className="bg-white border-b border-slate-200/90 px-4 py-2 shrink-0 flex items-center justify-between gap-2">
-          {/* Title */}
+          {/* Title & View Switcher */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs" />
               <span className="font-extrabold text-xs sm:text-sm text-slate-900 tracking-tight whitespace-nowrap">
-                Quadro de Chão de Fábrica
+                {activeSection === 'dashboard' ? 'Dashboard de Métricas MES' : 'Quadro de Chão de Fábrica'}
               </span>
             </div>
 
             <span className="text-slate-300 hidden md:inline">|</span>
-            <span className="text-[11px] text-slate-500 font-medium hidden sm:inline truncate">
-              Arraste as tarefas pendentes para as máquinas
-            </span>
+
+            {/* View Switcher Pills */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+              <button
+                onClick={() => setActiveSection('kanban')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeSection === 'kanban'
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Visualizar Chão de Fábrica no formato Kanban"
+              >
+                <Columns className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Quadro Kanban</span>
+              </button>
+              <button
+                onClick={() => setActiveSection('dashboard')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeSection === 'dashboard'
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Visualizar Indicadores OEE, Disponibilidade, Performance e Qualidade com Recharts"
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Dashboard OEE</span>
+              </button>
+            </div>
           </div>
 
           {/* Machine Status Counters & Actions */}
@@ -736,147 +811,212 @@ export default function App() {
           </div>
         </header>
 
-        {/* Kanban Board Canvas with permanent horizontal scroll */}
-        <main className="flex-1 p-3 overflow-hidden min-h-0 flex flex-col">
-          <div className="flex-1 flex items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-3 pt-1 px-1">
-            {columns.map((col) => {
-              const isDragTarget = dragOverColId === col.id;
-              const columnCards = col.cardIds
-                .map((id) => cards[id])
-                .filter(Boolean) as KanbanCard[];
+        {/* Dynamic View: Dashboard (Recharts) or Kanban Board */}
+        {activeSection === 'dashboard' ? (
+          <DashboardView
+            columns={columns}
+            cards={cards}
+            onGoToKanban={() => setActiveSection('kanban')}
+          />
+        ) : (
+          /* Kanban Board Canvas with permanent horizontal scroll */
+          <main className="flex-1 p-3 overflow-hidden min-h-0 flex flex-col">
+            <div className="flex-1 flex items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-3 pt-1 px-1">
+              {columns.map((col) => {
+                const isDragTarget = dragOverColId === col.id;
+                const columnCards = col.cardIds
+                  .map((id) => cards[id])
+                  .filter(Boolean) as KanbanCard[];
+                const { a, p, q, liveOee } = getColumnMetrics(col);
 
-              return (
-                <div
-                  key={col.id}
-                  onDragOver={(e) => handleDragOver(e, col.id)}
-                  onDragLeave={() => handleDragLeave(col.id)}
-                  onDrop={(e) => handleDrop(e, col.id)}
-                  className={`bg-[#e4e7ec] rounded-2xl p-2.5 flex flex-col h-full border min-w-0 transition-all w-64 sm:w-72 shrink-0 ${
-                    isDragTarget
-                      ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/30'
-                      : 'border-slate-300/70'
-                  }`}
-                >
-                  {/* Column Top Header: Badge is strictly contained with min-w-0 & truncate */}
-                  <div className="pb-1.5 pt-0.5 px-0.5 shrink-0 min-w-0 space-y-1">
-                    {/* Row 1: The Badge Pill */}
-                    <div className="flex items-center justify-between gap-1 min-w-0 w-full">
-                      <button
-                        onClick={() => {
-                          if (!col.isQueue) {
-                            setEditingMachine(col);
-                            setMachineStatusInput(col.status);
-                            setMachineReasonInput(col.stopReason || '');
-                          }
-                        }}
-                        className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase shadow-2xs transition-transform min-w-0 flex-1 max-w-[calc(100%-24px)] ${
-                          !col.isQueue ? 'hover:scale-102 cursor-pointer' : ''
-                        } ${col.badgeColor.bg} ${col.badgeColor.text}`}
-                        title={`${col.badgeLabel} - Clique para alterar status`}
-                      >
-                        <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 border border-black/20 ${col.badgeColor.dot}`} />
-                        <span className="truncate block text-left">
-                          {col.shortCode}
-                        </span>
-                      </button>
-
-                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 font-mono shrink-0 px-1">
-                        {columnCards.length}
-                      </span>
-                    </div>
-
-                    {/* Row 2: Machine Type & Subtitle */}
-                    <div className="text-[9px] sm:text-[10px] text-slate-500 font-medium truncate px-0.5" title={col.title}>
-                      <strong className="text-slate-700">{col.machineType}</strong> · {col.subtitle}
-                    </div>
-                  </div>
-
-                  {/* Cards Container: Smooth internal scroll, cleanly contained */}
-                  <div className="flex-1 overflow-y-auto space-y-1.5 sm:space-y-2 pr-0.5 min-h-0 min-w-0">
-                    {columnCards.map((card) => (
-                      <div
-                        key={card.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, card.id)}
-                        onClick={() => setSelectedCard(card)}
-                        className="bg-white rounded-lg sm:rounded-xl p-2 sm:p-2.5 shadow-2xs border border-slate-200/90 hover:shadow-md hover:border-slate-300 transition-all cursor-grab active:cursor-grabbing text-xs space-y-1.5 min-w-0 group"
-                      >
-                        {/* Card Title & Code */}
-                        <div className="flex items-baseline justify-between gap-1 min-w-0">
-                          <h3 className="font-bold text-slate-900 text-xs sm:text-sm leading-tight group-hover:text-blue-600 transition-colors truncate">
-                            {card.taskCode}
-                          </h3>
-                          <span className="text-[8px] sm:text-[9px] font-mono text-slate-400 font-semibold shrink-0">
-                            {card.orderNumber}
+                return (
+                  <div
+                    key={col.id}
+                    onDragOver={(e) => handleDragOver(e, col.id)}
+                    onDragLeave={() => handleDragLeave(col.id)}
+                    onDrop={(e) => handleDrop(e, col.id)}
+                    className={`bg-[#e4e7ec] rounded-2xl p-2.5 flex flex-col h-full border min-w-0 transition-all w-64 sm:w-72 shrink-0 ${
+                      isDragTarget
+                        ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/30'
+                        : 'border-slate-300/70'
+                    }`}
+                  >
+                    {/* Column Top Header */}
+                    <div className="pb-1.5 pt-0.5 px-0.5 shrink-0 min-w-0 space-y-1.5">
+                      {/* Row 1: The Badge Pill */}
+                      <div className="flex items-center justify-between gap-1 min-w-0 w-full">
+                        <button
+                          onClick={() => {
+                            if (!col.isQueue) {
+                              setEditingMachine(col);
+                              setMachineStatusInput(col.status);
+                              setMachineReasonInput(col.stopReason || '');
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase shadow-2xs transition-transform min-w-0 flex-1 max-w-[calc(100%-24px)] ${
+                            !col.isQueue ? 'hover:scale-102 cursor-pointer' : ''
+                          } ${col.badgeColor.bg} ${col.badgeColor.text}`}
+                          title={`${col.badgeLabel} - Clique para alterar status`}
+                        >
+                          <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 border border-black/20 ${col.badgeColor.dot}`} />
+                          <span className="truncate block text-left">
+                            {col.shortCode}
                           </span>
-                        </div>
+                        </button>
 
-                        {/* Product Name (Cleanly truncated) */}
-                        <p className="text-[10px] sm:text-[11px] text-slate-500 truncate leading-snug" title={card.productName}>
-                          {card.productName}
-                        </p>
-
-                        {/* Description Icon (the 3 lines from image) */}
-                        <div className="text-slate-300 flex items-center pt-0.5">
-                          <AlignLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                        </div>
-
-                        {/* Bottom Metadata: Avatar Circle + Calendar Day + Priority Flag */}
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[9px] sm:text-[10px] min-w-0 gap-1">
-                          {/* Avatar */}
-                          <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold shrink-0 ${card.avatarColor}`}>
-                            <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
-                          </div>
-
-                          {/* Calendar Day Badge */}
-                          <div className="flex items-center gap-0.5 sm:gap-1 border border-slate-200 bg-slate-50/80 px-1 py-0.5 rounded text-slate-600 font-mono text-[8px] sm:text-[9px] truncate shrink-0">
-                            <Calendar className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-slate-400" />
-                            <span>{card.dayBadge}</span>
-                          </div>
-
-                          {/* Priority Flag */}
-                          <div className="border border-slate-200 bg-slate-50/80 p-0.5 rounded shrink-0">
-                            <Flag className={`w-2 h-2 sm:w-2.5 sm:h-2.5 ${getPriorityFlagColor(card.priority)}`} />
-                          </div>
-                        </div>
-
-                        {/* If card is on a machine, show compact progress */}
-                        {!col.isQueue && card.plannedQty > 0 && (
-                          <div className="pt-0.5">
-                            <div className="flex justify-between text-[8px] sm:text-[9px] font-mono text-slate-500 mb-0.5">
-                              <span>{card.producedQty}/{card.plannedQty}</span>
-                              <span className="font-bold text-slate-700">
-                                {((card.producedQty / card.plannedQty) * 100).toFixed(0)}%
-                              </span>
-                            </div>
-                            <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
-                              <div
-                                className="h-full bg-emerald-500"
-                                style={{ width: `${(card.producedQty / card.plannedQty) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    {/* Empty State */}
-                    {columnCards.length === 0 && (
-                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-2 sm:p-3 text-center my-auto space-y-0.5">
-                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 block">
-                          Livre
+                        <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 font-mono shrink-0 px-1">
+                          {columnCards.length}
                         </span>
-                        <p className="text-[9px] text-slate-400">
-                          Solte uma tarefa
-                        </p>
                       </div>
-                    )}
+
+                      {/* Row 2: Real-time OEE, Availability, Performance, and Quality Metrics (replacing static subtitle) */}
+                      {col.isQueue ? (
+                        <div className="text-[9px] sm:text-[10px] text-slate-500 font-medium truncate px-0.5 flex items-center justify-between">
+                          <strong className="text-slate-700">{col.machineType}</strong>
+                          <span className="text-[9px] text-slate-400 font-mono">Fila Geral ({columnCards.length})</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5 pt-0.5 px-0.5">
+                          {/* Machine type + interactive OEE badge */}
+                          <div className="flex items-center justify-between text-[9px] sm:text-[10px]">
+                            <strong className="text-slate-700 truncate max-w-[125px]" title={col.title}>
+                              {col.machineType}
+                            </strong>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveSection('dashboard');
+                              }}
+                              className={`inline-flex items-center gap-1 font-mono font-bold text-[9px] px-1.5 py-0.2 rounded border cursor-pointer hover:scale-105 transition-transform shadow-2xs ${
+                                liveOee >= 85
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                  : liveOee >= 65
+                                  ? 'bg-blue-50 text-blue-800 border-blue-300'
+                                  : 'bg-rose-50 text-rose-800 border-rose-300'
+                              }`}
+                              title="OEE em Tempo Real (A×P×Q). Clique para abrir no Dashboard Recharts"
+                            >
+                              <span className="text-[8px] opacity-75">OEE</span>
+                              <span className="font-extrabold">{liveOee}%</span>
+                            </button>
+                          </div>
+
+                          {/* Real-time OEE Pillars Breakdown Strip: A, P, Q */}
+                          <div className="grid grid-cols-3 gap-1 text-[8px] font-mono text-center">
+                            <div className="bg-white/90 rounded px-1 py-0.5 border border-slate-200/90 shadow-2xs" title="Disponibilidade Real">
+                              <span className="text-slate-400 block text-[7px] font-sans leading-none">DISP</span>
+                              <span className="font-bold text-emerald-700">{a}%</span>
+                            </div>
+                            <div className="bg-white/90 rounded px-1 py-0.5 border border-slate-200/90 shadow-2xs" title="Performance Real">
+                              <span className="text-slate-400 block text-[7px] font-sans leading-none">PERF</span>
+                              <span className="font-bold text-purple-700">{p}%</span>
+                            </div>
+                            <div className="bg-white/90 rounded px-1 py-0.5 border border-slate-200/90 shadow-2xs" title="Qualidade Real">
+                              <span className="text-slate-400 block text-[7px] font-sans leading-none">QUAL</span>
+                              <span className="font-bold text-blue-700">{q}%</span>
+                            </div>
+                          </div>
+
+                          {/* Live OEE progress line */}
+                          <div className="w-full bg-slate-200/80 rounded-full h-1 overflow-hidden" title={`OEE: ${liveOee}%`}>
+                            <div
+                              className={`h-full transition-all duration-300 ${
+                                liveOee >= 85 ? 'bg-emerald-500' : liveOee >= 65 ? 'bg-blue-500' : 'bg-rose-500'
+                              }`}
+                              style={{ width: `${Math.min(100, liveOee)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Cards Container: Smooth internal scroll, cleanly contained */}
+                    <div className="flex-1 overflow-y-auto space-y-1.5 sm:space-y-2 pr-0.5 min-h-0 min-w-0">
+                      {columnCards.map((card) => (
+                        <div
+                          key={card.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, card.id)}
+                          onClick={() => setSelectedCard(card)}
+                          className="bg-white rounded-lg sm:rounded-xl p-2 sm:p-2.5 shadow-2xs border border-slate-200/90 hover:shadow-md hover:border-slate-300 transition-all cursor-grab active:cursor-grabbing text-xs space-y-1.5 min-w-0 group"
+                        >
+                          {/* Card Title & Code */}
+                          <div className="flex items-baseline justify-between gap-1 min-w-0">
+                            <h3 className="font-bold text-slate-900 text-xs sm:text-sm leading-tight group-hover:text-blue-600 transition-colors truncate">
+                              {card.taskCode}
+                            </h3>
+                            <span className="text-[8px] sm:text-[9px] font-mono text-slate-400 font-semibold shrink-0">
+                              {card.orderNumber}
+                            </span>
+                          </div>
+
+                          {/* Product Name (Cleanly truncated) */}
+                          <p className="text-[10px] sm:text-[11px] text-slate-500 truncate leading-snug" title={card.productName}>
+                            {card.productName}
+                          </p>
+
+                          {/* Description Icon (the 3 lines from image) */}
+                          <div className="text-slate-300 flex items-center pt-0.5">
+                            <AlignLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                          </div>
+
+                          {/* Bottom Metadata: Avatar Circle + Calendar Day + Priority Flag */}
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[9px] sm:text-[10px] min-w-0 gap-1">
+                            {/* Avatar */}
+                            <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold shrink-0 ${card.avatarColor}`}>
+                              <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
+                            </div>
+
+                            {/* Calendar Day Badge */}
+                            <div className="flex items-center gap-0.5 sm:gap-1 border border-slate-200 bg-slate-50/80 px-1 py-0.5 rounded text-slate-600 font-mono text-[8px] sm:text-[9px] truncate shrink-0">
+                              <Calendar className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-slate-400" />
+                              <span>{card.dayBadge}</span>
+                            </div>
+
+                            {/* Priority Flag */}
+                            <div className="border border-slate-200 bg-slate-50/80 p-0.5 rounded shrink-0">
+                              <Flag className={`w-2 h-2 sm:w-2.5 sm:h-2.5 ${getPriorityFlagColor(card.priority)}`} />
+                            </div>
+                          </div>
+
+                          {/* If card is on a machine, show compact progress */}
+                          {!col.isQueue && card.plannedQty > 0 && (
+                            <div className="pt-0.5">
+                              <div className="flex justify-between text-[8px] sm:text-[9px] font-mono text-slate-500 mb-0.5">
+                                <span>{card.producedQty}/{card.plannedQty}</span>
+                                <span className="font-bold text-slate-700">
+                                  {((card.producedQty / card.plannedQty) * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald-500"
+                                  style={{ width: `${(card.producedQty / card.plannedQty) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Empty State */}
+                      {columnCards.length === 0 && (
+                        <div className="border-2 border-dashed border-slate-300 rounded-lg p-2 sm:p-3 text-center my-auto space-y-0.5">
+                          <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 block">
+                            Livre
+                          </span>
+                          <p className="text-[9px] text-slate-400">
+                            Solte uma tarefa
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </main>
+                );
+              })}
+            </div>
+          </main>
+        )}
       </div>
 
       {/* Modal: Detalhes da Tarefa / Ordem */}
