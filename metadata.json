@@ -1,0 +1,6 @@
+{
+  "name": "IndusMES - Guia e Simulador de Sistema MES Industrial",
+  "description": "Plataforma interativa para entender e simular um Sistema MES (Manufacturing Execution System), norma ISA-95, cálculo de OEE em tempo real, ordens de produção e rastreabilidade industrial.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
